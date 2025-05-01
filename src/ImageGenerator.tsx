@@ -12,6 +12,7 @@ export function ImageGenerator() {
   const [seed, setSeed] = useState(-1);
   const [isGenerating, setIsGenerating] = useState(false);
   const [refImages, setRefImages] = useState<string[]>([]);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   
   const fileInputRefs = [
     useRef<HTMLInputElement>(null),
@@ -45,9 +46,25 @@ export function ImageGenerator() {
     }
   };
 
+  const handleDownload = async (imageUrl: string, prompt: string) => {
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${prompt.slice(0, 30).replace(/[^a-z0-9]/gi, '_')}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      toast.error("Failed to download image");
+    }
+  };
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    console.log("Submit button clicked!"); // Debug log
 
     if (!prompt) {
       toast.error("Please enter a prompt");
@@ -68,13 +85,10 @@ export function ImageGenerator() {
         refImage4: refImages[3] || undefined,
       };
       
-      console.log("Starting image generation with params:", params); // Debug log
-      
       setIsGenerating(true);
       toast.info("Starting image generation...");
       
       const result = await generate(params);
-      console.log("Generation result:", result); // Debug log
 
       if (!result) {
         throw new Error("No result from image generation");
@@ -231,7 +245,6 @@ export function ImageGenerator() {
         <button
           type="submit"
           disabled={isGenerating || !prompt}
-          onClick={() => console.log("Button clicked!")} // Extra debug log
           className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
         >
           {isGenerating ? (
@@ -249,19 +262,44 @@ export function ImageGenerator() {
         <h2 className="text-xl font-semibold text-gray-200">Your Generations</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {images?.map((image) => (
-            <div key={image._id} className="relative group">
+            <div key={image._id} className="group relative">
               <img
                 src={image.imageUrl}
                 alt={image.prompt}
-                className="w-full h-48 object-cover rounded-lg"
+                onClick={() => setSelectedImage(image.imageUrl)}
+                className="w-full h-48 object-cover rounded-lg cursor-pointer transform transition-transform hover:scale-[1.02]"
               />
-              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-end p-3">
-                <p className="text-sm text-white line-clamp-2">{image.prompt}</p>
+              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex flex-col justify-between p-3">
+                <p className="text-sm text-white line-clamp-3">{image.prompt}</p>
+                <button
+                  onClick={() => handleDownload(image.imageUrl, image.prompt)}
+                  className="w-full mt-2 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  Download
+                </button>
               </div>
             </div>
           ))}
         </div>
       </div>
+
+      {selectedImage && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setSelectedImage(null)}>
+          <div className="relative max-w-4xl max-h-[90vh]">
+            <img
+              src={selectedImage}
+              alt="Full size preview"
+              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+            />
+            <button
+              onClick={() => setSelectedImage(null)}
+              className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 text-white w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
